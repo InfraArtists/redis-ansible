@@ -106,10 +106,10 @@
   apt:
     state: fixed
 
-- name: Copy issue.net to remote servers
-  copy:
-    src: issue.net
-    dest: /etc/issue.net
+# - name: Copy issue.net to remote servers
+#   copy:
+#     src: issue.net
+#     dest: /etc/issue.net
 
 # - name: Set SSH banner in sshd_config
 #   lineinfile:
