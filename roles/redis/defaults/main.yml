@@ -1,2 +1,3 @@
 ---
-# defaults file for redis
+redis_maxmemory: "0"
+redis_maxmemory_policy: "noeviction"

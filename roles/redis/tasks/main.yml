@@ -1,8 +1,8 @@
 ---
 # tasks file for redis
 
-# - name: Configure redis
-#   include_tasks: redis.yml
+- name: Configure redis
+  include_tasks: redis.yml
 
 - name: Configure sentinel
   include_tasks: sentinel.yml

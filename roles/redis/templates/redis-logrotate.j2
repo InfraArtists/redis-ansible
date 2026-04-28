@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+/var/log/redis/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 640 redis redis
+    sharedscripts
+    postrotate
+        /bin/kill -USR1 $(cat /run/redis/redis-server.pid 2>/dev/null) 2>/dev/null || true
+    endscript
+}
