@@ -6,12 +6,18 @@
     state: present
     update_cache: yes
 
-- name: Copy haproxy config file
+- name: Deploy haproxy config
   template:
-    src: templates/haproxy.cfg.j2
-    dest: /etc/haproxy/haproxy.cfg.test
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
     owner: root
     group: root
-    mode: 0644
+    mode: "0644"
   notify: Reload haproxy
+
+- name: Ensure haproxy is started and enabled
+  service:
+    name: haproxy
+    state: started
+    enabled: true
 
