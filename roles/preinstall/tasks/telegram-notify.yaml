@@ -2,7 +2,7 @@
 
 - name: Copy telegram-send
   copy:
-    src: files/telegram-send
+    src: telegram-send
     dest: /usr/bin/telegram-send
     owner: root
     group: root
@@ -10,7 +10,7 @@
 
 - name: Copy login-notify
   copy:
-    src: files/login-notify.sh
+    src: login-notify.sh
     dest: /etc/profile.d/login-notify.sh
     owner: root
     group: root

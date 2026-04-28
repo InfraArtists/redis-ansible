@@ -2,13 +2,20 @@
   timezone:
     name: Etc/UTC
 
-- name: Set hostname
-  command: hostnamectl set-hostname {{ inventory_hostname }}
+- name: Write /etc/hostname
+  copy:
+    content: "{{ inventory_hostname }}\n"
+    dest: /etc/hostname
+
+- name: Apply hostname to running kernel
+  command: hostname {{ inventory_hostname }}
+  changed_when: false
 
 - name: Remove symlink resolve.conf | Comment this task if you live in outside of Iran :)
   file:
     path: "/etc/resolv.conf"
     state: absent
+  when: use_iran == "true"
   ignore_errors: true
 
 - name: Configure resolv.conf | Comment this task if you live in outside of Iran :)
@@ -18,7 +25,7 @@
     mode: "0644"
   when: use_iran == "true"
 
-- name: Add hostname
+- name: Set 127.0.0.1 hosts entry
   lineinfile:
     path: /etc/hosts
     regexp: '^127\.0\.0\.1'
@@ -27,7 +34,7 @@
     group: root
     mode: 0644
 
-- name: Add hostname
+- name: Set 127.0.1.1 hosts entry
   lineinfile:
     path: /etc/hosts
     regexp: '^127\.0\.1\.1'
@@ -99,19 +106,36 @@
   apt:
     state: fixed
 
-- name: Copy issue.net to remote servers
-  copy:
-    src: issue.net
-    dest: /etc/issue.net
+# - name: Copy issue.net to remote servers
+#   copy:
+#     src: issue.net
+#     dest: /etc/issue.net
 
-- name: Ensure SSHD config is correct
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^Banner'
-    line: 'Banner /etc/issue.net'
-  notify: restart sshd
+# - name: Set SSH banner in sshd_config
+#   lineinfile:
+#     path: /etc/ssh/sshd_config
+#     regexp: '^Banner'
+#     line: 'Banner /etc/issue.net'
+#   notify: restart ssh
 
-- name: Copy MOTD to remote servers
+# - name: Copy MOTD to remote servers
+#   copy:
+#     src: motd
+#     dest: /etc/motd
+
+- name: Deploy disable-thp systemd unit
   copy:
-    src: motd
-    dest: /etc/motd
+    src: disable-thp.service
+    dest: /etc/systemd/system/disable-thp.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: disable_transparent_huge_pages == "true"
+
+- name: Enable and start disable-thp service
+  systemd:
+    name: disable-thp
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: disable_transparent_huge_pages == "true"
