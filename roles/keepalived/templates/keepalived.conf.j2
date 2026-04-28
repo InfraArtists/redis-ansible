@@ -1,0 +1,42 @@
+# {{ ansible_managed }}
+
+# Health-check: keepalived promotes/demotes based on whether HAProxy is alive.
+# Weight +2 means MASTER stays master as long as haproxy is up.
+vrrp_script chk_haproxy {
+    script "/usr/bin/pgrep haproxy"
+    interval 2
+    weight   2
+    fall     2
+    rise     2
+}
+
+vrrp_instance VI_1 {
+    state               {{ keepalived_state }}
+    interface           {{ haproxy_vip_interface }}
+    virtual_router_id   {{ keepalived_vrid }}
+    priority            {{ keepalived_priority }}
+    advert_int          1
+
+    # Unicast mode — required on most cloud providers where multicast is blocked.
+    unicast_src_ip {{ private_ip }}
+    unicast_peer {
+{% for host in groups['haproxy'] %}
+{% if hostvars[host]['private_ip'] != private_ip %}
+        {{ hostvars[host]['private_ip'] }}
+{% endif %}
+{% endfor %}
+    }
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ haproxy_vip }}
+    }
+
+    track_script {
+        chk_haproxy
+    }
+}
