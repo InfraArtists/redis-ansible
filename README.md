@@ -202,7 +202,7 @@ ansible-playbook redis.yaml --ask-vault-pass
 ### 1. Verify SSH connectivity
 
 ```bash
-ansible all -m ping
+ansible -i inventory/hosts.yml all -m ping
 ```
 
 All 5 nodes should return `pong`. (`ansible.cfg` sets the inventory automatically.)
@@ -248,20 +248,20 @@ ansible-playbook redis.yaml --tags redis -e force_sentinel_config=true
 
 ```bash
 # Should return role:master
-redis-cli -h 192.168.122.11 -a <password> info replication | grep -E 'role|connected_slaves'
+redis-cli -h 192.168.100.11 -a <password> info replication | grep -E 'role|connected_slaves'
 
 # Should return role:slave
-redis-cli -h 192.168.122.12 -a <password> info replication | grep role
-redis-cli -h 192.168.122.13 -a <password> info replication | grep role
+redis-cli -h 192.168.100.12 -a <password> info replication | grep role
+redis-cli -h 192.168.100.13 -a <password> info replication | grep role
 ```
 
 ### Check Sentinel state
 
 ```bash
 # Run on any Redis node — should show mymaster and its slaves
-redis-cli -h 192.168.122.11 -p 26379 sentinel master mymaster
-redis-cli -h 192.168.122.11 -p 26379 sentinel slaves mymaster
-redis-cli -h 192.168.122.11 -p 26379 sentinel sentinels mymaster
+redis-cli -h 192.168.100.11 -p 26379 sentinel master mymaster
+redis-cli -h 192.168.100.11 -p 26379 sentinel slaves mymaster
+redis-cli -h 192.168.100.11 -p 26379 sentinel sentinels mymaster
 ```
 
 ### Check the VIP is active
@@ -343,11 +343,38 @@ redis-cli -h 192.168.122.200 -a <password> get failover-test
 
 ---
 
+## Read / Write traffic separation
+
+HAProxy exposes two ports on the VIP:
+
+| Port | Purpose | Routes to | Health check |
+|------|---------|-----------|--------------|
+| `6379` | **Writes** | Current master only | `role:master` |
+| `6380` | **Reads** | Slaves only, round-robin | `role:slave` |
+
+Point your application's Redis write client to `192.168.122.200:6379` and read client to `192.168.122.200:6380`.
+
+After a Sentinel failover the promoted slave becomes master and its health check flips automatically — HAProxy re-routes writes to the new master and removes it from the read pool, all within 1–2 seconds.
+
+```bash
+# Test writes (goes to master)
+redis-cli -h 192.168.122.200 -p 6379 -a <password> set foo bar
+
+# Test reads (round-robins across slaves)
+redis-cli -h 192.168.122.200 -p 6380 -a <password> get foo
+
+# See which node each connection hits
+redis-cli -h 192.168.122.200 -p 6380 -a <password> info server | grep tcp_port
+```
+
+---
+
 ## Ports reference
 
 | Port | Service | Nodes |
 |------|---------|-------|
 | 6379 | Redis | redis-server-1/2/3 |
 | 26379 | Redis Sentinel | redis-server-1/2/3 |
-| 6379 | HAProxy → Redis (VIP entry point) | haproxy-1/2 |
+| 6379 | HAProxy → writes → master | haproxy-1/2 |
+| 6380 | HAProxy → reads → slaves (round-robin) | haproxy-1/2 |
 | 8585 | HAProxy stats UI | haproxy-1/2 |

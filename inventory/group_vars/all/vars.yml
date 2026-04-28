@@ -15,10 +15,11 @@ sentinel_port: "26379"
 redis_password: "{{ vault_redis_password }}"
 
 # HAProxy + Keepalived
-haproxy_vip: "192.168.122.200"
-haproxy_vip_interface: "enp1s0"
+haproxy_vip: "192.168.100.200" # virtual IP in your private subnet
+haproxy_vip_interface: "enp7s0"
 keepalived_auth_pass: "{{ vault_keepalived_auth_pass }}"
 keepalived_vrid: "51"
 haproxy_stats_port: "8585"
 haproxy_stats_user: "admin"
 haproxy_stats_password: "{{ vault_haproxy_stats_password }}"
+haproxy_read_port: "6380"
