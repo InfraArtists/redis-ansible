@@ -15,6 +15,7 @@
 - hosts: haproxy
   roles:
     - role: haproxy
+    - role: keepalived
   gather_facts: yes
   any_errors_fatal: true
   tags: [haproxy]
