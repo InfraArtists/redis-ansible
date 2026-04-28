@@ -1,0 +1,24 @@
+# General
+install_ansible_modules: "true"
+disable_transparent_huge_pages: "true"
+setup_interface: "false"
+
+# DNS
+resolv_nameservers: [8.8.8.8, 4.2.2.2]
+
+# Iran-specific DNS workaround — set to "false" if outside Iran
+use_iran: "false"
+
+# Redis
+master_port: "6379"
+sentinel_port: "26379"
+redis_password: "{{ vault_redis_password }}"
+
+# HAProxy + Keepalived
+haproxy_vip: "192.168.122.200"
+haproxy_vip_interface: "enp1s0"
+keepalived_auth_pass: "{{ vault_keepalived_auth_pass }}"
+keepalived_vrid: "51"
+haproxy_stats_port: "8585"
+haproxy_stats_user: "admin"
+haproxy_stats_password: "{{ vault_haproxy_stats_password }}"

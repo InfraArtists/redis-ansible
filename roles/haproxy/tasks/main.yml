@@ -1,0 +1,17 @@
+---
+# tasks file for haproxy
+- name: Install haproxy
+  apt:
+    name: haproxy
+    state: present
+    update_cache: yes
+
+- name: Copy haproxy config file
+  template:
+    src: templates/haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg.test
+    owner: root
+    group: root
+    mode: 0644
+  notify: Reload haproxy
+

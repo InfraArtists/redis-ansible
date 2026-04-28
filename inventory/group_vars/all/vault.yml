@@ -1,0 +1,5 @@
+# Encrypt this file with: ansible-vault encrypt inventory/group_vars/all/vault.yml
+# Edit after encrypting:  ansible-vault edit   inventory/group_vars/all/vault.yml
+vault_redis_password: "CHANGE_ME_STRONG_REDIS_PASSWORD"
+vault_keepalived_auth_pass: "CHANGE_ME_KEEPALIVED_PASS"
+vault_haproxy_stats_password: "CHANGE_ME_STATS_PASSWORD"

@@ -1,0 +1,35 @@
+- name: Capture master private IP
+  set_fact:
+    master_ip: "{{ hostvars[item].private_ip }}"
+  when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
+  loop: "{{ groups['all'] }}"
+  # run_once: true
+
+- name: Display master IP (for debugging)
+  debug:
+    msg: "The master IP is {{ master_ip }}"
+
+- name: Configure sentinel
+  lineinfile:
+    path: /etc/redis/sentinel.conf.bk
+    line: sentinel monitor mymaster {{ master_ip }} 6379 2
+    create: yes
+
+- name: Copy sentinel systemd file
+  template:
+    src: templates/sentinel.service.j2
+    dest: /etc/systemd/system/redis-sentinel.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Start sentinel service
+  systemd:
+    name: redis-sentinel
+    state: started
+    enabled: yes
+

@@ -1,0 +1,42 @@
+# - name: Install redis-server packages
+#   apt:
+#     name:
+#       - redis-server
+#       - redis-sentinel
+#     state: present
+#     update_cache: yes
+#     notify: Stop sentinel service
+
+# - name: Change redis-server bind config
+#   lineinfile:
+#     path: /etc/redis/redis.conf
+#     regexp: "^bind"
+#     line: "bind {{ private_ip }} 127.0.0.1"
+#   notify: Restart redis-server
+
+# - name: Change redis-server protected-mode
+#   lineinfile:
+#     path: /etc/redis/redis.conf
+#     regexp: "^protected-mode"
+#     line: "protected-mode no"
+#   notify: Restart redis-server
+
+# - name: Capture master private IP
+#   set_fact:
+#     master_ip: "{{ hostvars[item].private_ip }}"
+#   when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
+#   loop: "{{ groups['all'] }}"
+#   # run_once: true 
+
+# - name: Display master IP (for debugging)
+#   debug:
+#     msg: "The master IP is {{ master_ip }}"
+
+
+# - name: Add master ip to slave servers
+#   lineinfile:
+#     path: /etc/redis/redis.conf
+#     regexp: "^slaveof"
+#     line: "slaveof {{ master_ip }} {{ master_port }}"
+#   when: role == 'slave'
+#   notify: Restart redis-server
