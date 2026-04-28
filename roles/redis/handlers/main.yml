@@ -1,13 +1,16 @@
 ---
-# handlers file for redis
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
 - name: Restart redis-server
   service:
     name: redis-server
     state: restarted
-    enabled: yes
+    enabled: true
 
-- name: Stop sentinel service
+- name: Restart redis-sentinel
   service:
     name: redis-sentinel
-    state: stopped
-    enabled: no
+    state: restarted
+    enabled: true

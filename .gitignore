@@ -1,1 +1,3 @@
 *.tmp
+*.retry
+.vault_pass

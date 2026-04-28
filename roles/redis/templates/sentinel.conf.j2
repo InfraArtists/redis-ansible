@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+
+bind {{ private_ip }} 127.0.0.1
+port {{ sentinel_port }}
+
+loglevel notice
+logfile /var/log/redis/redis-sentinel.log
+
+dir /tmp
+
+# Monitor the master — quorum of 2 means 2 sentinels must agree before failover
+sentinel monitor mymaster {{ master_ip }} {{ master_port }} 2
+sentinel auth-pass mymaster {{ redis_password }}
+
+# Mark a node down after 5 s of no response
+sentinel down-after-milliseconds mymaster 5000
+
+# Allow at most 60 s for a failover to complete
+sentinel failover-timeout mymaster 60000
+
+# Reconfigure only 1 replica at a time after failover
+sentinel parallel-syncs mymaster 1
+
+# Announce private IP so other sentinels/clients reach us correctly
+sentinel announce-ip {{ private_ip }}
+sentinel announce-port {{ sentinel_port }}

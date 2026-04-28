@@ -1,42 +1,76 @@
-# - name: Install redis-server packages
-#   apt:
-#     name:
-#       - redis-server
-#       - redis-sentinel
-#     state: present
-#     update_cache: yes
-#     notify: Stop sentinel service
+- name: Capture master private IP
+  set_fact:
+    master_ip: "{{ hostvars[item].private_ip }}"
+  when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
+  loop: "{{ groups['redis'] }}"
 
-# - name: Change redis-server bind config
-#   lineinfile:
-#     path: /etc/redis/redis.conf
-#     regexp: "^bind"
-#     line: "bind {{ private_ip }} 127.0.0.1"
-#   notify: Restart redis-server
+- name: Install redis packages
+  apt:
+    name:
+      - redis-server
+      - redis-sentinel
+    state: present
+    update_cache: yes
 
-# - name: Change redis-server protected-mode
-#   lineinfile:
-#     path: /etc/redis/redis.conf
-#     regexp: "^protected-mode"
-#     line: "protected-mode no"
-#   notify: Restart redis-server
+- name: Stop default redis-sentinel before configuration
+  service:
+    name: redis-sentinel
+    state: stopped
+    enabled: false
+  ignore_errors: true
 
-# - name: Capture master private IP
-#   set_fact:
-#     master_ip: "{{ hostvars[item].private_ip }}"
-#   when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
-#   loop: "{{ groups['all'] }}"
-#   # run_once: true 
+- name: Set vm.overcommit_memory for Redis
+  sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    state: present
+    reload: true
 
-# - name: Display master IP (for debugging)
-#   debug:
-#     msg: "The master IP is {{ master_ip }}"
+- name: Set net.core.somaxconn for Redis
+  sysctl:
+    name: net.core.somaxconn
+    value: "65535"
+    state: present
+    reload: true
 
+- name: Ensure redis log directory exists
+  file:
+    path: /var/log/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: "0750"
 
-# - name: Add master ip to slave servers
-#   lineinfile:
-#     path: /etc/redis/redis.conf
-#     regexp: "^slaveof"
-#     line: "slaveof {{ master_ip }} {{ master_port }}"
-#   when: role == 'slave'
-#   notify: Restart redis-server
+- name: Ensure redis data directory exists
+  file:
+    path: /var/lib/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: "0750"
+
+- name: Deploy redis.conf
+  template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: "0640"
+  notify: Restart redis-server
+
+- name: Ensure redis-server is started and enabled
+  service:
+    name: redis-server
+    state: started
+    enabled: yes
+
+- name: Deploy logrotate config for Redis
+  template:
+    src: redis-logrotate.j2
+    dest: /etc/logrotate.d/redis
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Flush handlers so redis-server is running before sentinel starts
+  meta: flush_handlers

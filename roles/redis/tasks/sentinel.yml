@@ -2,34 +2,41 @@
   set_fact:
     master_ip: "{{ hostvars[item].private_ip }}"
   when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
-  loop: "{{ groups['all'] }}"
-  # run_once: true
+  loop: "{{ groups['redis'] }}"
 
-- name: Display master IP (for debugging)
-  debug:
-    msg: "The master IP is {{ master_ip }}"
+- name: Check if sentinel.conf already exists
+  stat:
+    path: /etc/redis/sentinel.conf
+  register: sentinel_conf_stat
 
-- name: Configure sentinel
-  lineinfile:
-    path: /etc/redis/sentinel.conf.bk
-    line: sentinel monitor mymaster {{ master_ip }} 6379 2
-    create: yes
-
-- name: Copy sentinel systemd file
+- name: Deploy sentinel.conf (initial deploy only — sentinel rewrites this after failover)
   template:
-    src: templates/sentinel.service.j2
+    src: sentinel.conf.j2
+    dest: /etc/redis/sentinel.conf
+    owner: redis
+    group: redis
+    mode: "0640"
+  when: not sentinel_conf_stat.stat.exists or (force_sentinel_config | default(false) | bool)
+  notify: Restart redis-sentinel
+
+- name: Deploy sentinel systemd unit
+  template:
+    src: sentinel.service.j2
     dest: /etc/systemd/system/redis-sentinel.service
     owner: root
     group: root
-    mode: 0644
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart redis-sentinel
 
 - name: Reload systemd daemon
   systemd:
-    daemon_reload: yes
+    daemon_reload: true
 
-- name: Start sentinel service
-  systemd:
+- name: Ensure redis-sentinel is started and enabled
+  service:
     name: redis-sentinel
     state: started
-    enabled: yes
+    enabled: true
 
