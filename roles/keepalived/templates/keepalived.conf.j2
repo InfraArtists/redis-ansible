@@ -1,13 +1,20 @@
 # {{ ansible_managed }}
 
+global_defs {
+    script_user root
+    enable_script_security
+}
+
 # Health-check: keepalived promotes/demotes based on whether HAProxy is alive.
-# Weight +2 means MASTER stays master as long as haproxy is up.
+# weight 2  — node with running HAProxy wins the VIP election
+# fall  2   — 2 consecutive failures (4 s) before marking down
+# rise  1   — 1 success is enough to restore priority immediately
 vrrp_script chk_haproxy {
-    script "/usr/bin/pgrep haproxy"
+    script "/usr/bin/systemctl is-active haproxy"
     interval 2
     weight   2
     fall     2
-    rise     2
+    rise     1
 }
 
 vrrp_instance VI_1 {
@@ -18,11 +25,12 @@ vrrp_instance VI_1 {
     advert_int          1
 
     # Unicast mode — required on most cloud providers where multicast is blocked.
-    unicast_src_ip {{ private_ip }}
+    # Use the IP on the same interface as the VIP (ansible_host = enp1s0 IP).
+    unicast_src_ip {{ ansible_host }}
     unicast_peer {
 {% for host in groups['haproxy'] %}
-{% if hostvars[host]['private_ip'] != private_ip %}
-        {{ hostvars[host]['private_ip'] }}
+{% if hostvars[host]['ansible_host'] != ansible_host %}
+        {{ hostvars[host]['ansible_host'] }}
 {% endif %}
 {% endfor %}
     }

@@ -39,11 +39,12 @@ listen stats
     stats show-node
     stats hide-version
 
-frontend front_redis
-    bind 0.0.0.0:6379
-    default_backend back_redis
+# --- Write traffic (master only) ---
+frontend front_redis_write
+    bind 0.0.0.0:{{ master_port }}
+    default_backend back_redis_write
 
-backend back_redis
+backend back_redis_write
     option tcp-check
     tcp-check send AUTH\ {{ redis_password }}\r\n
     tcp-check expect string +OK
@@ -54,5 +55,25 @@ backend back_redis
     tcp-check send QUIT\r\n
     tcp-check expect string +OK
 {% for host in groups['redis'] %}
-    server {{ host }} {{ hostvars[host]['private_ip'] }}:6379 check inter 1s
+    server {{ host }} {{ hostvars[host]['private_ip'] }}:{{ master_port }} check inter 1s
+{% endfor %}
+
+# --- Read traffic (slaves only, round-robin) ---
+frontend front_redis_read
+    bind 0.0.0.0:{{ haproxy_read_port }}
+    default_backend back_redis_read
+
+backend back_redis_read
+    balance roundrobin
+    option tcp-check
+    tcp-check send AUTH\ {{ redis_password }}\r\n
+    tcp-check expect string +OK
+    tcp-check send PING\r\n
+    tcp-check expect string +PONG
+    tcp-check send info\ replication\r\n
+    tcp-check expect string role:slave
+    tcp-check send QUIT\r\n
+    tcp-check expect string +OK
+{% for host in groups['redis'] %}
+    server {{ host }} {{ hostvars[host]['private_ip'] }}:{{ master_port }} check inter 1s
 {% endfor %}

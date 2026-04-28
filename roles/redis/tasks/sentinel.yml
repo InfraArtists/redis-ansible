@@ -4,19 +4,20 @@
   when: "'role' in hostvars[item] and hostvars[item].role == 'master'"
   loop: "{{ groups['redis'] }}"
 
-- name: Check if sentinel.conf already exists
-  stat:
-    path: /etc/redis/sentinel.conf
-  register: sentinel_conf_stat
+- name: Check if sentinel.conf was deployed by Ansible (vs package default)
+  command: grep -q "ansible_managed" /etc/redis/sentinel.conf
+  register: sentinel_conf_managed
+  changed_when: false
+  failed_when: false
 
-- name: Deploy sentinel.conf (initial deploy only — sentinel rewrites this after failover)
+- name: Deploy sentinel.conf
   template:
     src: sentinel.conf.j2
     dest: /etc/redis/sentinel.conf
     owner: redis
     group: redis
     mode: "0640"
-  when: not sentinel_conf_stat.stat.exists or (force_sentinel_config | default(false) | bool)
+  when: sentinel_conf_managed.rc != 0 or (force_sentinel_config | default(false) | bool)
   notify: Restart redis-sentinel
 
 - name: Deploy sentinel systemd unit
