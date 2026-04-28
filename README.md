@@ -12,7 +12,7 @@ Production-ready Redis Sentinel cluster with dual HAProxy + Keepalived (VRRP) fo
                              ▼
                     ┌────────────────┐
                     │  Virtual IP    │
-                    │ 192.168.122.200│  ◄── Keepalived VRRP floats this IP
+                    │ 192.168.100.200│  ◄── Keepalived VRRP floats this IP
                     └───────┬────────┘         between haproxy-1 and haproxy-2
                             │
               ┌─────────────┴─────────────┐
@@ -36,7 +36,7 @@ Production-ready Redis Sentinel cluster with dual HAProxy + Keepalived (VRRP) fo
           ▼                ▼                ▼
 ┌──────────────────┐ ┌──────────────┐ ┌──────────────┐
 │  redis-server-1  │ │redis-server-2│ │redis-server-3│
-│  192.168.122.11  │ │192.168.122.12│ │192.168.122.13│
+│  192.168.100.11  │ │192.168.100.12│ │192.168.100.13│
 │  role: MASTER    │ │role: SLAVE   │ │role: SLAVE   │
 │  Redis   :6379   │ │Redis  :6379  │ │Redis  :6379  │
 │  Sentinel:26379  │ │Sentinel:26379│ │Sentinel:26379│
@@ -267,16 +267,16 @@ redis-cli -h 192.168.100.11 -p 26379 sentinel sentinels mymaster
 ### Check the VIP is active
 
 ```bash
-ping 192.168.122.200
+ping 192.168.100.200
 
 # Should succeed — write through VIP, read back
-redis-cli -h 192.168.122.200 -a <password> set test "hello"
-redis-cli -h 192.168.122.200 -a <password> get test
+redis-cli -h 192.168.100.200 -a <password> set test "hello"
+redis-cli -h 192.168.100.200 -a <password> get test
 ```
 
 ### HAProxy stats UI
 
-Open in a browser: `http://192.168.122.200:8585`
+Open in a browser: `http://192.168.100.200:8585`
 
 Login with `admin` / your stats password. The `back_redis` backend shows all 3 Redis nodes. Only the current master is green — slaves are red because the health check verifies `role:master`. This is expected.
 
@@ -288,41 +288,41 @@ Login with `admin` / your stats password. The `back_redis` backend shows all 3 R
 
 ```bash
 # 1. Write a key through the VIP
-redis-cli -h 192.168.122.200 -a <password> set failover-test "before"
+redis-cli -h 192.168.100.200 -a <password> set failover-test "before"
 
 # 2. Stop Redis on the master
-ssh milad@192.168.122.11 "sudo systemctl stop redis-server"
+ssh milad@192.168.100.11 "sudo systemctl stop redis-server"
 
 # 3. Watch Sentinel elect a new master (takes ~5-10 seconds)
-watch -n1 'redis-cli -h 192.168.122.12 -p 26379 sentinel master mymaster | grep -E "name|ip|port|flags"'
+watch -n1 'redis-cli -h 192.168.100.12 -p 26379 sentinel master mymaster | grep -E "name|ip|port|flags"'
 
 # 4. Confirm traffic routes to the new master — key must still be readable
-redis-cli -h 192.168.122.200 -a <password> get failover-test
+redis-cli -h 192.168.100.200 -a <password> get failover-test
 
 # 5. Confirm which node is now master
-redis-cli -h 192.168.122.12 -a <password> info replication | grep role
-redis-cli -h 192.168.122.13 -a <password> info replication | grep role
+redis-cli -h 192.168.100.12 -a <password> info replication | grep role
+redis-cli -h 192.168.100.13 -a <password> info replication | grep role
 
 # 6. Restore the old master (it will rejoin as a slave)
-ssh milad@192.168.122.11 "sudo systemctl start redis-server"
-redis-cli -h 192.168.122.11 -a <password> info replication | grep role
+ssh milad@192.168.100.11 "sudo systemctl start redis-server"
+redis-cli -h 192.168.100.11 -a <password> info replication | grep role
 ```
 
 ### Test 2 — HAProxy node failure (VIP failover)
 
 ```bash
 # 1. Confirm VIP is on haproxy-1
-ssh milad@192.168.122.14 "ip addr show | grep 192.168.122.200"
+ssh milad@192.168.122.14 "ip addr show | grep 192.168.100.200"
 
 # 2. Stop HAProxy on haproxy-1
 ssh milad@192.168.122.14 "sudo systemctl stop haproxy"
 
 # 3. Keepalived detects the failure within ~4 seconds and moves the VIP
 #    Watch the VIP appear on haproxy-2
-watch -n1 'ssh milad@192.168.122.15 "ip addr show | grep 192.168.122.200"'
+watch -n1 'ssh milad@192.168.122.15 "ip addr show | grep 192.168.100.200"'
 
 # 4. Traffic through VIP still works
-redis-cli -h 192.168.122.200 -a <password> ping
+redis-cli -h 192.168.100.200 -a <password> ping
 
 # 5. Restore haproxy-1 — VIP stays on haproxy-2 until haproxy-2 fails
 #    (non-preemptive by default; haproxy-1 rejoins as backup)
@@ -332,13 +332,13 @@ ssh milad@192.168.122.14 "sudo systemctl start haproxy"
 ### Test 3 — Full chaos (master + one HAProxy down simultaneously)
 
 ```bash
-ssh milad@192.168.122.11 "sudo systemctl stop redis-server" &
+ssh milad@192.168.100.11 "sudo systemctl stop redis-server" &
 ssh milad@192.168.122.14 "sudo systemctl stop haproxy" &
 wait
 
 # Allow ~10 seconds for both failovers to complete, then verify
-redis-cli -h 192.168.122.200 -a <password> ping
-redis-cli -h 192.168.122.200 -a <password> get failover-test
+redis-cli -h 192.168.100.200 -a <password> ping
+redis-cli -h 192.168.100.200 -a <password> get failover-test
 ```
 
 ---
@@ -352,19 +352,19 @@ HAProxy exposes two ports on the VIP:
 | `6379` | **Writes** | Current master only | `role:master` |
 | `6380` | **Reads** | Slaves only, round-robin | `role:slave` |
 
-Point your application's Redis write client to `192.168.122.200:6379` and read client to `192.168.122.200:6380`.
+Point your application's Redis write client to `192.168.100.200:6379` and read client to `192.168.100.200:6380`.
 
 After a Sentinel failover the promoted slave becomes master and its health check flips automatically — HAProxy re-routes writes to the new master and removes it from the read pool, all within 1–2 seconds.
 
 ```bash
 # Test writes (goes to master)
-redis-cli -h 192.168.122.200 -p 6379 -a <password> set foo bar
+redis-cli -h 192.168.100.200 -p 6379 -a <password> set foo bar
 
 # Test reads (round-robins across slaves)
-redis-cli -h 192.168.122.200 -p 6380 -a <password> get foo
+redis-cli -h 192.168.100.200 -p 6380 -a <password> get foo
 
 # See which node each connection hits
-redis-cli -h 192.168.122.200 -p 6380 -a <password> info server | grep tcp_port
+redis-cli -h 192.168.100.200 -p 6380 -a <password> info server | grep tcp_port
 ```
 
 ---
